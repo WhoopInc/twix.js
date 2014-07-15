@@ -26,6 +26,10 @@ makeTwix = (moment) ->
       @end = moment end, parseFormat, options.parseStrict
       @allDay = options.allDay ? false
 
+      @_trueStart = if @allDay then @start.clone().startOf("day") else @start
+      @_trueEnd = if @allDay then @end.clone().endOf("day") else @end
+      @_trueEndDiffable = if @allDay then @end.clone().add(1, "day") else @end
+
     @_extend: (first, others...) ->
       for other in others
         for attr of other
@@ -84,7 +88,7 @@ makeTwix = (moment) ->
     isSame: (period) -> @start.isSame @end, period
 
     length: (period) ->
-      @_trueEnd(true).diff @_trueStart(), period
+      @_trueEndDiffable.diff @_trueStart, period
 
     count: (period) ->
       start = @start.clone().startOf period
@@ -142,16 +146,16 @@ makeTwix = (moment) ->
     isCurrent: -> !@isPast() && !@isFuture()
 
     contains: (mom) ->
-      mom = moment mom
-      @_trueStart() <= mom && @_trueEnd() >= mom
+      mom = moment(mom) unless moment.isMoment(mom)
+      @_trueStart <= mom && @_trueEnd >= mom
 
     isEmpty: ->
-      @_trueStart().valueOf() == @_trueEnd().valueOf()
+      @_trueStart.valueOf() == @_trueEnd.valueOf()
 
     # -- WORK WITH MULTIPLE RANGES --
-    overlaps: (other) -> (@_trueEnd().isAfter(other._trueStart()) && @_trueStart().isBefore(other._trueEnd()))
+    overlaps: (other) -> (@_trueEnd.isAfter(other._trueStart) && @_trueStart.isBefore(other._trueEnd))
 
-    engulfs: (other) -> @_trueStart() <= other._trueStart() && @_trueEnd() >= other._trueEnd()
+    engulfs: (other) -> @_trueStart <= other._trueStart && @_trueEnd >= other._trueEnd
 
     union: (other) ->
       allDay = @allDay && other.allDay
@@ -159,8 +163,8 @@ makeTwix = (moment) ->
         newStart = if @start < other.start then @start else other.start
         newEnd = if @end > other.end then @end else other.end
       else
-        newStart = if @_trueStart() < other._trueStart() then @_trueStart() else other._trueStart()
-        newEnd = if @_trueEnd() > other._trueEnd() then @_trueEnd() else other._trueEnd()
+        newStart = if @_trueStart < other._trueStart then @_trueStart else other._trueStart
+        newEnd = if @_trueEnd > other._trueEnd then @_trueEnd else other._trueEnd
 
       new Twix(newStart, newEnd, allDay)
 
@@ -181,7 +185,7 @@ makeTwix = (moment) ->
       new Twix(newStart, newEnd, allDay)
 
     isValid: ->
-      @_trueStart() <= @_trueEnd()
+      @_trueStart <= @_trueEnd
 
     equals: (other) ->
       (other instanceof Twix) &&
@@ -350,16 +354,6 @@ makeTwix = (moment) ->
       fold common_bucket
 
     # -- INTERNAL
-    _trueStart: -> if @allDay then @start.clone().startOf("day") else @start.clone()
-
-    _trueEnd: (diffableEnd = false) ->
-      if @allDay
-        if diffableEnd
-          @end.clone().add(1, "day")
-        else
-          @end.clone().endOf("day")
-      else
-        @end.clone()
 
     _iterateHelper: (period, iter, hasNext, intervalAmount = 1) ->
       next: =>
@@ -388,8 +382,8 @@ makeTwix = (moment) ->
       [intervalAmount, period, minHours]
 
     _inner: (period = "milliseconds", intervalAmount = 1) ->
-      start = @_trueStart()
-      end = @_trueEnd true
+      start = @_trueStart.clone()
+      end = @_trueEndDiffable.clone()
 
       start.startOf(period).add(intervalAmount, period) if start > start.clone().startOf(period)
       end.startOf(period) if end < end.clone().endOf(period)
